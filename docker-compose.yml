@@ -51,7 +51,6 @@ services:
     image: zabbix/zabbix-web-nginx-mysql:alpine-latest
     volumes:
       - /etc/localtime:/etc/localtime:ro
-      - /etc/timezone:/etc/timezone:ro
       - ./data/nginx/nginx:/etc/ssl/nginx:ro
       - ./data/nginx/modules/:/usr/share/zabbix/modules/:ro
     environment:
