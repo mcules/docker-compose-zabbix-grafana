@@ -6,4 +6,12 @@ Falls ihr andere Einstellungen habt oder keinen Traefik nutzt, müsst ihr den St
 In der .env müsst ihr noch eure URL's anpassen.
 Die Passwörter solltet ihr bei der Gelegenheit ebenfalls gleich mit ändern ;)
 
-Falls ihr noch kein DOcker installiert habt, gibt es [hier](https://blog.denniseisold.de/blog/2023/03/15/docker-snippets/) noch ein paar Snippets dazu.
+Falls ihr noch kein Docker installiert habt, gibt es [hier](https://blog.denniseisold.de/blog/2023/03/15/docker-snippets/) noch ein paar Snippets dazu.
+
+## Zugangsdaten
+
+### Grafana
+`admin:admin`
+
+### Zabbix
+`Admin:zabbix`
