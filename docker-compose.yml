@@ -1,0 +1,124 @@
+version: '3.5'
+
+services:
+  mysql:
+    image: mysql:8.0
+    networks:
+      zabbix-network:
+    command:
+      - mysqld
+      - --character-set-server=utf8
+      - --collation-server=utf8_bin
+      - --default-authentication-plugin=mysql_native_password
+    environment:
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ZBX_JAVAGATEWAY: java-gateway
+      TZ: ${TIMEZONE}
+    volumes:
+      - ./data/mysql:/var/lib/mysql:rw
+
+  zabbix:
+    image: zabbix/zabbix-server-mysql:alpine-latest
+    networks:
+      zabbix-network:
+    ports:
+      - 10051:10051
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - ./data/zabbix/alertscripts:/usr/lib/zabbix/alertscripts:ro
+      - ./data/zabbix/externalscripts:/usr/lib/zabbix/externalscripts:ro
+      - ./data/zabbix/export:/var/lib/zabbix/export:rw
+      - ./data/zabbix/modules:/var/lib/zabbix/modules:ro
+      - ./data/zabbix/enc:/var/lib/zabbix/enc:ro
+      - ./data/zabbix/ssh_keys:/var/lib/zabbix/ssh_keys:ro
+      - ./data/zabbix/mibs:/var/lib/zabbix/mibs:ro
+      - ./data/zabbix/snmptraps:/var/lib/zabbix/snmptraps:rw
+    environment:
+      DB_SERVER_HOST: mysql
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      ZBX_JAVAGATEWAY: java-gateway
+      TZ: ${TIMEZONE}
+    depends_on:
+      - mysql
+
+  frontend:
+    image: zabbix/zabbix-web-nginx-mysql:alpine-latest
+    volumes:
+      - /etc/localtime:/etc/localtime:ro
+      - /etc/timezone:/etc/timezone:ro
+      - ./data/nginx/nginx:/etc/ssl/nginx:ro
+      - ./data/nginx/modules/:/usr/share/zabbix/modules/:ro
+    environment:
+      ZBX_SERVER_HOST: zabbix
+      DB_SERVER_HOST: mysql
+      MYSQL_USER: ${MYSQL_USER}
+      MYSQL_DATABASE: ${MYSQL_DATABASE}
+      MYSQL_PASSWORD: ${MYSQL_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD}
+      PHP_TZ: ${TIMEZONE}
+    depends_on:
+      - mysql
+      - zabbix
+    labels:
+      traefik.enable: true
+      traefik.http.routers.zabbix.entrypoints: https
+      traefik.http.routers.zabbix.rule: (Host(`${ZABBIX_FRONTEND_HOSTNAME}`))
+      traefik.http.routers.zabbix.tls: true
+      traefik.http.routers.zabbix.tls.certresolver: http
+      traefik.http.routers.zabbix.service: zabbix
+      traefik.http.services.zabbix.loadbalancer.server.port: 8080
+      traefik.docker.network: proxy
+      traefik.http.routers.zabbix.middlewares: default@file
+    networks:
+      zabbix-network:
+      proxy:
+
+  java-gateway:
+    image: zabbix/zabbix-java-gateway:alpine-latest
+    networks:
+      zabbix-network:
+    ports:
+      - 10052:10052
+
+  grafana:
+    image: grafana/grafana:latest
+    networks:
+        zabbix-network:
+        proxy:
+    links:
+      - mysql
+      - zabbix
+    restart: always
+    ports:
+      - '3000:3000'
+    volumes:
+      - ./data/grafana:/var/lib/grafana
+    user: "$UID:$GID"
+    environment: 
+      GF_INSTALL_PLUGINS: alexanderzobnin-zabbix-app
+      TZ: ${TIMEZONE}
+    labels:
+      traefik.enable: true
+      traefik.http.routers.zabbix_grafana.entrypoints: https
+      traefik.http.routers.zabbix_grafana.rule: (Host(`${GRAFANA_HOSTNAME}`))
+      traefik.http.routers.zabbix_grafana.tls: true
+      traefik.http.routers.zabbix_grafana.tls.certresolver: http
+      traefik.http.routers.zabbix_grafana.service: zabbix_grafana
+      traefik.http.services.zabbix_grafana.loadbalancer.server.port: 3000
+      traefik.docker.network: proxy
+      traefik.http.routers.zabbix_grafana.middlewares: default@file
+    depends_on:
+      - mysql
+      - zabbix
+
+networks:
+  zabbix-network:
+    driver: bridge
+  proxy:
+    external: true
